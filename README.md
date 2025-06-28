@@ -64,9 +64,7 @@ src/
 
 ### Home Page
 1. Enter your API key and pub_user_id
-2. Or check "Use demo credentials" to auto-fill with demo values:
-   - **API Key**: `d3468440-4124-45e2-a0ff-13d8f89bec42`
-   - **pub_user_id**: `MomentScienceUSPDemo`
+2. Or check "Use demo credentials" to auto-fill with demo values
 3. Click "Start Session" to navigate to the perks selection page
 
 ### Demo Credentials
