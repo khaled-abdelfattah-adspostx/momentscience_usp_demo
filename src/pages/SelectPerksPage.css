@@ -721,7 +721,18 @@
 }
 
 .offer-checkbox {
-  transform: scale(1.1);
+  transform: scale(1.2);
+  accent-color: #667eea;
+}
+
+.offer-checkbox:checked {
+  animation: checkboxPulse 0.3s ease;
+}
+
+@keyframes checkboxPulse {
+  0% { transform: scale(1.2); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1.2); }
 }
 
 .offer-cta {
@@ -1354,6 +1365,17 @@
   font-size: 0.75rem;
   color: #666;
   font-family: monospace;
+}
+
+.log-description {
+  font-size: 0.9rem;
+  color: #4a5568;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background: #f7fafc;
+  border-radius: 4px;
+  border-left: 3px solid #667eea;
+  font-style: italic;
 }
 
 .log-offer {

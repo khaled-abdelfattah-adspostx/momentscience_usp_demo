@@ -50,6 +50,21 @@ const SelectPerksPage = () => {
     error: string | null
   }[]>([])
   const [autoSelectionHandled, setAutoSelectionHandled] = useState(false)
+  const [renderKey, setRenderKey] = useState(0)
+
+  // Helper function to get action descriptions
+  const getActionDescription = (action: string) => {
+    const descriptions: { [key: string]: string } = {
+      'fetch_offers': 'Calling the MomentScience API to fetch available offers for the user',
+      'select': 'The user selected a single offer to add to their preferences',
+      'unselect': 'The user unselected a single offer from their preferences',
+      'bulk_select_all': 'The user selected all available offers at once',
+      'bulk_unselect_all': 'The user unselected all offers at once',
+      'auto_select_all': 'Automatically selected all offers based on USP settings',
+      'wrap_session': 'Finalizing the session with selected offers and sending completion data to MomentScience'
+    }
+    return descriptions[action] || `API action: ${action.replace('_', ' ')}`
+  }
 
   // Load session data from localStorage on component mount
   useEffect(() => {
@@ -70,14 +85,30 @@ const SelectPerksPage = () => {
 
   // Auto-select offers when they are loaded and settings indicate auto-selection
   useEffect(() => {
-    if (offers.length > 0 && !autoSelectionHandled && apiResponse?.data?.settings?.usp_all_offers_checked) {
+    // Temporarily force auto-selection for testing
+    const shouldAutoSelect = apiResponse?.data?.settings?.usp_all_offers_checked || true // Force true for testing
+    
+    if (offers.length > 0 && !autoSelectionHandled && shouldAutoSelect) {
       const campaignIds = offers.map(offer => offer.campaign_id).filter((id): id is number => Boolean(id))
-      console.log('Auto-selecting offers:', { campaignIds, offers: offers.length })
-      setSelectedOffers(new Set(campaignIds))
-      setAutoSelectionHandled(true)
+      console.log('Auto-selecting offers:', { 
+        campaignIds, 
+        offers: offers.length,
+        uspAllOffersChecked: shouldAutoSelect,
+        currentSelectedOffers: Array.from(selectedOffers)
+      })
       
-      // Automatically call the update session API with all offers selected
-      handleAutoSelection(campaignIds)
+      const newSelectedSet = new Set<string | number>(campaignIds)
+      console.log('Setting selectedOffers to:', Array.from(newSelectedSet))
+      
+      // Update state immediately
+      setSelectedOffers(newSelectedSet)
+      setAutoSelectionHandled(true)
+      setRenderKey(prev => prev + 1)
+      
+      // Call API after state update
+      setTimeout(() => {
+        handleAutoSelection(campaignIds)
+      }, 100)
     }
   }, [offers, apiResponse, autoSelectionHandled])
 
@@ -602,11 +633,17 @@ const SelectPerksPage = () => {
                       <div className="log-time">{new Date(log.timestamp).toLocaleTimeString()}</div>
                     </div>
                     
+                    {/* Action Description */}
+                    <div className="log-description">
+                      {getActionDescription(log.action)}
+                    </div>
+                    
                     {log.offer && (
                       <div className="log-offer">
-                        {log.action.includes('bulk') ? 
+                        {log.action.includes('bulk') || log.action.includes('auto_select') ? 
                           `${log.offer.count} offers` : 
-                          (log.offer.title || log.offer.headline || `Campaign ${log.offer.campaign_id}`)}
+                          (log.offer.title || log.offer.headline || 
+                           (log.offer.campaign_id ? `Campaign ${log.offer.campaign_id}` : ''))}
                       </div>
                     )}
 
@@ -679,7 +716,7 @@ const SelectPerksPage = () => {
         </div>
 
         {/* Auto-selection notification */}
-        {autoSelectionHandled && apiResponse?.data?.settings?.usp_all_offers_checked && (
+        {autoSelectionHandled && (apiResponse?.data?.settings?.usp_all_offers_checked || true) && (
           <div className="auto-selection-banner">
             <div className="banner-content">
               <div className="banner-icon">✓</div>
@@ -731,24 +768,26 @@ const SelectPerksPage = () => {
               </div>
             </div>
 
-            <div className="offers-grid">
+            <div className="offers-grid" key={renderKey}>
               {offers.map((offer) => {
                 const campaignId = offer.campaign_id
                 const isSelected = campaignId ? selectedOffers.has(campaignId) : false
                 
-                // Debug logging
-                if (autoSelectionHandled && apiResponse?.data?.settings?.usp_all_offers_checked && campaignId) {
-                  console.log('Offer selection check:', { 
+                // Debug logging for auto-selection
+                if (campaignId && selectedOffers.size > 0) {
+                  console.log('Checkbox render check:', { 
                     campaignId, 
+                    campaignIdType: typeof campaignId,
                     isSelected, 
                     selectedOffers: Array.from(selectedOffers),
-                    hasInSet: selectedOffers.has(campaignId)
+                    hasInSet: selectedOffers.has(campaignId),
+                    autoSelectionHandled
                   })
                 }
 
                 return (
                   <div
-                    key={offer.id || offer.campaign_id}
+                    key={`${offer.id || offer.campaign_id}-${isSelected}`}
                     className={`offer-card ${isSelected ? 'selected' : ''}`}
                   >
                     {/* Offer Image */}
