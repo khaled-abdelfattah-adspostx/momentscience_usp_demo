@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, startTransition, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './SelectPerksPage.css'
 
@@ -26,6 +26,7 @@ interface Offer {
 
 const SelectPerksPage = () => {
   const navigate = useNavigate()
+  const initialFetchDone = useRef(false)
   const [sessionData, setSessionData] = useState<SessionData | null>(null)
   const [offers, setOffers] = useState<Offer[]>([])
   const [sessionId, setSessionId] = useState<string>('')
@@ -51,6 +52,7 @@ const SelectPerksPage = () => {
   }[]>([])
   const [autoSelectionHandled, setAutoSelectionHandled] = useState(false)
   const [renderKey, setRenderKey] = useState(0)
+  const [forceAutoSelect, setForceAutoSelect] = useState(false)
 
   // Helper function to get action descriptions
   const getActionDescription = (action: string) => {
@@ -68,11 +70,15 @@ const SelectPerksPage = () => {
 
   // Load session data from localStorage on component mount
   useEffect(() => {
+    // Prevent duplicate calls in React StrictMode
+    if (initialFetchDone.current) return
+    
     const storedSessionData = localStorage.getItem('sessionData')
     if (storedSessionData) {
       try {
         const parsedData = JSON.parse(storedSessionData)
         setSessionData(parsedData)
+        initialFetchDone.current = true
         fetchOffers(parsedData)
       } catch (error) {
         console.error('Error parsing stored session data:', error)
@@ -85,32 +91,51 @@ const SelectPerksPage = () => {
 
   // Auto-select offers when they are loaded and settings indicate auto-selection
   useEffect(() => {
-    // Temporarily force auto-selection for testing
-    const shouldAutoSelect = apiResponse?.data?.settings?.usp_all_offers_checked || true // Force true for testing
+    // Check for auto-selection setting from API response or manual override
+    // TEMPORARILY FORCE AUTO-SELECT FOR TESTING
+    const shouldAutoSelect = apiResponse?.data?.settings?.usp_all_offers_checked || forceAutoSelect || true
+    
+    console.log('🔍 Auto-selection check:', {
+      hasApiResponse: !!apiResponse,
+      hasData: !!apiResponse?.data,
+      hasSettings: !!apiResponse?.data?.settings,
+      uspAllOffersChecked: apiResponse?.data?.settings?.usp_all_offers_checked,
+      forceAutoSelect,
+      shouldAutoSelect,
+      offersLength: offers.length,
+      autoSelectionHandled
+    })
     
     if (offers.length > 0 && !autoSelectionHandled && shouldAutoSelect) {
+      console.log('🔄 TRIGGERING AUTO-SELECTION')
       const campaignIds = offers.map(offer => offer.campaign_id).filter((id): id is number => Boolean(id))
-      console.log('Auto-selecting offers:', { 
-        campaignIds, 
-        offers: offers.length,
-        uspAllOffersChecked: shouldAutoSelect,
-        currentSelectedOffers: Array.from(selectedOffers)
+      
+      console.log('📋 Campaign IDs to select:', campaignIds)
+      
+      // CRITICAL FIX: Force immediate synchronous UI update
+      const newSelectedSet = new Set<string | number>(campaignIds)
+      
+      // Batch state updates for immediate UI reflection
+      startTransition(() => {
+        setSelectedOffers(newSelectedSet)
+        setAutoSelectionHandled(true)
+        setRenderKey(prev => prev + 1)
       })
       
-      const newSelectedSet = new Set<string | number>(campaignIds)
-      console.log('Setting selectedOffers to:', Array.from(newSelectedSet))
+      console.log('✅ State updated, selectedOffers now contains:', Array.from(newSelectedSet))
       
-      // Update state immediately
-      setSelectedOffers(newSelectedSet)
-      setAutoSelectionHandled(true)
-      setRenderKey(prev => prev + 1)
+      // Double-check with a micro-task to ensure UI updates
+      queueMicrotask(() => {
+        console.log('🔍 Micro-task check - selectedOffers:', Array.from(newSelectedSet))
+        setRenderKey(prev => prev + 1) // Force another render
+      })
       
-      // Call API after state update
+      // Call API after ensuring UI state is set
       setTimeout(() => {
         handleAutoSelection(campaignIds)
-      }, 100)
+      }, 250)
     }
-  }, [offers, apiResponse, autoSelectionHandled])
+  }, [offers, apiResponse, autoSelectionHandled, forceAutoSelect])
 
   const handleAutoSelection = async (campaignIds: number[]) => {
     if (!sessionData || !sessionId || campaignIds.length === 0) return
@@ -496,6 +521,7 @@ const SelectPerksPage = () => {
   const handleRetry = () => {
     if (sessionData) {
       setAutoSelectionHandled(false)
+      initialFetchDone.current = false // Reset the flag for retry
       fetchOffers(sessionData)
     }
   }
@@ -716,12 +742,14 @@ const SelectPerksPage = () => {
         </div>
 
         {/* Auto-selection notification */}
-        {autoSelectionHandled && (apiResponse?.data?.settings?.usp_all_offers_checked || true) && (
+        {autoSelectionHandled && (apiResponse?.data?.settings?.usp_all_offers_checked || forceAutoSelect || true) && (
           <div className="auto-selection-banner">
             <div className="banner-content">
               <div className="banner-icon">✓</div>
               <div className="banner-text">
-                <strong>Auto-Selection Active:</strong> All offers have been automatically selected and sent to the session API based on your USP settings.
+                <strong>Auto-Selection Active:</strong> All offers have been automatically selected and sent to the session API.
+                {forceAutoSelect && <span> (Manually triggered)</span>}
+                {!apiResponse?.data?.settings?.usp_all_offers_checked && !forceAutoSelect && <span> (Demo mode - forced for testing)</span>}
               </div>
             </div>
           </div>
@@ -765,29 +793,37 @@ const SelectPerksPage = () => {
                 >
                   Unselect All
                 </button>
+                <button
+                  onClick={() => {
+                    setAutoSelectionHandled(false)
+                    setForceAutoSelect(true)
+                  }}
+                  disabled={autoSelectionHandled}
+                  className="bulk-button test-auto-select"
+                >
+                  Test Auto-Select
+                </button>
               </div>
             </div>
 
-            <div className="offers-grid" key={renderKey}>
-              {offers.map((offer) => {
+            <div className="offers-grid" key={`grid-${renderKey}-${selectedOffers.size}`}>
+              {offers.map((offer, index) => {
                 const campaignId = offer.campaign_id
                 const isSelected = campaignId ? selectedOffers.has(campaignId) : false
                 
-                // Debug logging for auto-selection
-                if (campaignId && selectedOffers.size > 0) {
-                  console.log('Checkbox render check:', { 
-                    campaignId, 
-                    campaignIdType: typeof campaignId,
-                    isSelected, 
-                    selectedOffers: Array.from(selectedOffers),
-                    hasInSet: selectedOffers.has(campaignId),
-                    autoSelectionHandled
-                  })
-                }
+                // Enhanced debug logging for auto-selection
+                console.log(`🔍 Render offer ${index + 1}:`, { 
+                  campaignId, 
+                  isSelected, 
+                  selectedOffersSize: selectedOffers.size,
+                  hasInSet: campaignId ? selectedOffers.has(campaignId) : 'no-id',
+                  autoSelectionHandled,
+                  renderKey
+                })
 
                 return (
                   <div
-                    key={`${offer.id || offer.campaign_id}-${isSelected}`}
+                    key={`offer-${offer.id || offer.campaign_id}-${isSelected}-${renderKey}`}
                     className={`offer-card ${isSelected ? 'selected' : ''}`}
                   >
                     {/* Offer Image */}
@@ -825,10 +861,14 @@ const SelectPerksPage = () => {
                     <div className="offer-actions">
                       <label className="offer-checkbox-label">
                         <input
+                          key={`checkbox-${campaignId}-${isSelected}-${renderKey}`}
                           type="checkbox"
                           className="offer-checkbox"
                           checked={isSelected}
-                          onChange={(e) => campaignId && handleOfferSelection(campaignId, e.target.checked)}
+                          onChange={(e) => {
+                            console.log(`📝 Checkbox changed for campaign ${campaignId}:`, e.target.checked)
+                            campaignId && handleOfferSelection(campaignId, e.target.checked)
+                          }}
                           disabled={!campaignId}
                         />
                         <span className="offer-cta">

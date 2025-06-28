@@ -604,6 +604,11 @@
   color: white;
 }
 
+.bulk-button.test-auto-select {
+  background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
+  color: white;
+}
+
 .bulk-button:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
