@@ -72,10 +72,72 @@ const SelectPerksPage = () => {
   useEffect(() => {
     if (offers.length > 0 && !autoSelectionHandled && apiResponse?.data?.settings?.usp_all_offers_checked) {
       const campaignIds = offers.map(offer => offer.campaign_id).filter((id): id is number => Boolean(id))
+      console.log('Auto-selecting offers:', { campaignIds, offers: offers.length })
       setSelectedOffers(new Set(campaignIds))
       setAutoSelectionHandled(true)
+      
+      // Automatically call the update session API with all offers selected
+      handleAutoSelection(campaignIds)
     }
   }, [offers, apiResponse, autoSelectionHandled])
+
+  const handleAutoSelection = async (campaignIds: number[]) => {
+    if (!sessionData || !sessionId || campaignIds.length === 0) return
+
+    try {
+      const endpoint = `https://api-staging.adspostx.com/sdk/v4/usp/session/${sessionId}.json`
+      const requestBody = {
+        key: sessionData.apiKey,
+        pub_user_id: sessionData.pubUserId,
+        selected_campaigns: campaignIds
+      }
+
+      const curlCommand = `curl -X PUT '${endpoint}' \\
+  -H 'Content-Type: application/json' \\
+  -H 'Authorization: Bearer ${sessionData.apiKey}' \\
+  -d '${JSON.stringify(requestBody, null, 2)}'`
+
+      console.log('Auto-selecting all offers:', { endpoint, requestBody })
+      console.log('Auto-select cURL:', curlCommand)
+
+      const response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionData.apiKey}`
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      const responseData = await response.json()
+      console.log('Auto-select response:', responseData)
+
+      // Add to selection logs
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        action: 'auto_select_all',
+        offer: { count: campaignIds.length, campaigns: campaignIds, reason: 'usp_all_offers_checked=true' },
+        request: { endpoint, body: requestBody, curl: curlCommand },
+        response: responseData,
+        error: null
+      }
+      setSelectionLogs(prev => [logEntry, ...prev])
+
+    } catch (error) {
+      console.error('Error auto-selecting offers:', error)
+      
+      // Add error to selection logs
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        action: 'auto_select_all',
+        offer: { count: campaignIds.length, campaigns: campaignIds, reason: 'usp_all_offers_checked=true' },
+        request: { campaignIds },
+        response: null,
+        error: error instanceof Error ? error.message : 'Failed to auto-select offers'
+      }
+      setSelectionLogs(prev => [logEntry, ...prev])
+    }
+  }
 
   const fetchOffers = async (data: SessionData) => {
     setLoading(true)
@@ -616,6 +678,18 @@ const SelectPerksPage = () => {
           </div>
         </div>
 
+        {/* Auto-selection notification */}
+        {autoSelectionHandled && apiResponse?.data?.settings?.usp_all_offers_checked && (
+          <div className="auto-selection-banner">
+            <div className="banner-content">
+              <div className="banner-icon">✓</div>
+              <div className="banner-text">
+                <strong>Auto-Selection Active:</strong> All offers have been automatically selected and sent to the session API based on your USP settings.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Session Information */}
         <div className="session-info">
           <div className="session-header">
@@ -661,6 +735,16 @@ const SelectPerksPage = () => {
               {offers.map((offer) => {
                 const campaignId = offer.campaign_id
                 const isSelected = campaignId ? selectedOffers.has(campaignId) : false
+                
+                // Debug logging
+                if (autoSelectionHandled && apiResponse?.data?.settings?.usp_all_offers_checked && campaignId) {
+                  console.log('Offer selection check:', { 
+                    campaignId, 
+                    isSelected, 
+                    selectedOffers: Array.from(selectedOffers),
+                    hasInSet: selectedOffers.has(campaignId)
+                  })
+                }
 
                 return (
                   <div
