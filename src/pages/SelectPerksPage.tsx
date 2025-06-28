@@ -94,7 +94,8 @@ const SelectPerksPage = () => {
         dev: 1
       }
 
-      const curlCommand = `curl -X POST 'https://api-staging.adspostx.com/native/v2/offers.json' \\
+      const endpoint = 'https://api-staging.adspostx.com/native/v2/offers.json'
+      const curlCommand = `curl -X POST '${endpoint}' \\
   -H 'Content-Type: application/json' \\
   -H 'Authorization: Bearer ${data.apiKey}' \\
   -d '${JSON.stringify(requestBody, null, 2)}'`
@@ -102,7 +103,7 @@ const SelectPerksPage = () => {
       console.log('Fetching offers with request:', requestBody)
       console.log('cURL command:', curlCommand)
 
-      const response = await fetch('https://api-staging.adspostx.com/native/v2/offers.json', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -126,6 +127,17 @@ const SelectPerksPage = () => {
       
       setOffers(offersData)
       setSessionId(sessionIdData)
+
+      // Add to selection logs for API tracking
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        action: 'fetch_offers',
+        offer: { count: offersData.length, session_id: sessionIdData },
+        request: { endpoint, body: requestBody, curl: curlCommand },
+        response: responseData,
+        error: null
+      }
+      setSelectionLogs(prev => [logEntry, ...prev])
       
     } catch (error) {
       console.error('Error fetching offers:', error)
@@ -655,11 +667,6 @@ const SelectPerksPage = () => {
                     key={offer.id || offer.campaign_id}
                     className={`offer-card ${isSelected ? 'selected' : ''}`}
                   >
-                    {/* Advertiser Name */}
-                    <div className="offer-advertiser">
-                      {offer.advertiser_name || 'Unknown Advertiser'}
-                    </div>
-
                     {/* Offer Image */}
                     <div className="offer-image">
                       {(offer.image || offer.creative || offer.logo) ? (
@@ -668,7 +675,11 @@ const SelectPerksPage = () => {
                           alt={offer.title || offer.headline || 'Offer'} 
                         />
                       ) : (
-                        <div style={{ color: '#9ca3af', fontSize: '2rem' }}>📷</div>
+                        <div className="offer-image-placeholder">
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 19V5C21 3.9 20.1 3 19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19ZM8.5 13.5L11 16.51L14.5 12L19 18H5L8.5 13.5Z" fill="#9CA3AF"/>
+                          </svg>
+                        </div>
                       )}
                     </div>
 
@@ -680,6 +691,11 @@ const SelectPerksPage = () => {
                       <p className="offer-description">
                         {offer.description || offer.short_description || 'No description available'}
                       </p>
+                      <div className="offer-meta">
+                        <span className="advertiser-name">
+                          {offer.advertiser_name || 'Unknown Advertiser'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Offer Actions */}
@@ -709,20 +725,6 @@ const SelectPerksPage = () => {
           </div>
         )}
 
-        {/* Wrap Session Section */}
-        {offers.length > 0 && (
-          <div className="wrap-session-section" style={{ textAlign: 'center', margin: '2rem 0' }}>
-            <button
-              onClick={wrapSession}
-              disabled={!sessionId || selectedOffers.size === 0}
-              className="primary-button"
-              style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}
-            >
-              Wrap Session
-            </button>
-          </div>
-        )}
-
         {/* Actions */}
         <div className="actions">
           <button onClick={handleGoHome} className="secondary-button">
@@ -731,6 +733,15 @@ const SelectPerksPage = () => {
           <button onClick={handleRetry} className="primary-button">
             Refresh Offers
           </button>
+          {offers.length > 0 && (
+            <button
+              onClick={wrapSession}
+              disabled={!sessionId || selectedOffers.size === 0}
+              className="primary-button"
+            >
+              Wrap Session
+            </button>
+          )}
         </div>
       </div>
     </div>

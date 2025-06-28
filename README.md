@@ -119,6 +119,24 @@ After entering credentials, the app will:
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
+- `npm run deploy` - Deploy to GitHub Pages (builds and deploys)
+
+## Deployment
+
+### GitHub Pages
+
+This project is configured for automatic deployment to GitHub Pages:
+
+1. **Automatic Deployment**: Push to the `main` branch triggers automatic deployment via GitHub Actions
+2. **Manual Deployment**: Run `npm run deploy` to build and deploy manually
+3. **Live Demo**: After deployment, the app will be available at `https://[username].github.io/momentscience_usp_demo/`
+
+### Configuration
+
+- **Base Path**: Configured for GitHub Pages in `vite.config.ts`
+- **Static Assets**: Properly configured for GitHub Pages asset handling
+- **Favicon**: Uses Shopify cart icon for branding
+- **Title**: "MS USP Demo" for clean branding
 
 ## Technologies Used
 
@@ -139,43 +157,3 @@ This demo app is designed to integrate with the MomentScience USP API. The crede
 3. Make your changes
 4. Test thoroughly
 5. Submit a pull request
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
