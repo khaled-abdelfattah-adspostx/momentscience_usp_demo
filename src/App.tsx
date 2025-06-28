@@ -5,7 +5,7 @@ import './App.css'
 
 function App() {
   return (
-    <Router>
+    <Router basename="/momentscience_usp_demo">
       <div className="app">
         <Routes>
           <Route path="/" element={<HomePage />} />
