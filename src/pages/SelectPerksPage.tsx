@@ -33,8 +33,9 @@ const SelectPerksPage = () => {
   const initialFetchDone = useRef(false)
   const [sessionData, setSessionData] = useState<SessionData | null>(null)
   const [offers, setOffers] = useState<Offer[]>([])
-  const [sessionId, setSessionId] = useState<string>('')
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false)
   const [error, setError] = useState<string>('')
   const [apiResponse, setApiResponse] = useState<any>(null)
   const [showSidebar, setShowSidebar] = useState(true)
@@ -494,21 +495,35 @@ const SelectPerksPage = () => {
     }
 
     try {
-      setLoading(true)
+      setIsPaymentProcessing(true)
+      
+      // Make sure sidebar is visible to show technical details
+      setShowSidebar(true)
+      
+      // Switch to API logs tab to show the payment processing
+      setActiveTab('api')
       
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 2000))
       
       // Call wrap session API after successful payment
-      await wrapSession()
+      const wrapResult = await wrapSession()
       
-      // Navigate to thank you page
+      // Get the latest wrap session log entry for detailed information
+      const latestWrapSessionLog = selectionLogs.find(log => log.action === 'wrap_session')
+      
+      // Navigate to thank you page with payment results and API details
       navigate('/thank-you', { 
         state: { 
           sessionId,
           selectedOffers: Array.from(selectedOffers),
           offerCount: selectedOffers.size,
-          totalAmount: '$39.97'
+          totalAmount: '$39.97',
+          wrapSessionSuccess: wrapResult.success,
+          wrapSessionRequest: wrapResult.request,
+          wrapSessionResponse: wrapResult.response,
+          webhookPayload: wrapResult.webhookPayload,
+          webhookFieldDescriptions: wrapResult.webhookFieldDescriptions
         }
       })
       
@@ -516,12 +531,18 @@ const SelectPerksPage = () => {
       console.error('Payment failed:', error)
       alert('Payment failed. Please try again.')
     } finally {
-      setLoading(false)
+      setIsPaymentProcessing(false)
     }
   }
 
-  const wrapSession = async () => {
-    if (!sessionData || !sessionId) return
+  const wrapSession = async (): Promise<{
+    success: boolean;
+    request?: any;
+    response?: any;
+    webhookPayload?: any;
+    webhookFieldDescriptions?: any;
+  }> => {
+    if (!sessionData || !sessionId) return { success: false }
 
     try {
       const endpoint = `https://api-staging.adspostx.com/sdk/v4/usp/session/${sessionId}.json`
@@ -531,6 +552,98 @@ const SelectPerksPage = () => {
         action: 'wrap'
       }
 
+      // Create a webhook payload example that would be sent to the publisher
+      const webhookPayload = {
+        body: {
+          campaigns: Array.from(selectedOffers).map(campaignId => {
+            const offer = offers.find(o => o.campaign_id === campaignId) || {};
+            return {
+              campaign_id: campaignId,
+              advertiser_name: offer.advertiser_name || "",
+              title: offer.title || "",
+              short_headline: offer.headline || "",
+              short_description: offer.short_description || "",
+              offer_description: offer.description || "",
+              terms_and_conditions: offer.terms || "",
+              click_url: offer.click_url || "",
+              cta_yes: offer.cta_yes || "Claim Now",
+              cta_no: offer.cta_no || "No Thanks",
+              mini_text: offer.mini_text || "",
+              image: offer.image || "",
+              pixel: offer.pixel || "",
+              adv_pixel_url: offer.adv_pixel_url || "",
+              save_for_later_url: offer.save_for_later_url || "",
+              description: offer.description || "",
+              is_loyaltyboost: false,
+              loyaltyboost_requirements: {},
+              offerwall_enabled: false,
+              perkswallet_enabled: false,
+              tags: offer.tags || [],
+              beacons: {
+                close: "",
+                no_thanks_click: ""
+              },
+              creatives: [
+                {
+                  id: 0,
+                  url: offer.image || "",
+                  type: "image",
+                  creative_type: "primary",
+                  aspect_ratio: 1.78,
+                  height: 600,
+                  width: 1067,
+                  user_id: 0,
+                  is_primary: true
+                }
+              ],
+              campaign: {
+                is_product: false,
+                offer_description: offer.description || "",
+                campaign_images: [
+                  {
+                    id: 0,
+                    url: offer.image || "",
+                    type: "image",
+                    creative_type: "primary",
+                    aspect_ratio: 1.78,
+                    height: 600,
+                    width: 1067,
+                    user_id: 0,
+                    is_primary: true
+                  }
+                ]
+              },
+              useraction_cta: null,
+              useraction_url: null
+            };
+          }),
+          pub_user_id: sessionData.pubUserId,
+          selected: selectedOffers.size > 0 ? 1 : 0,
+          session_id: sessionId
+        }
+      };
+
+      // Create webhook field descriptions
+      const webhookFieldDescriptions = {
+        "body": "Container for the webhook payload data",
+        "body.campaigns": "Array of offers selected by the user",
+        "body.campaign_id": "The internal ID of the offer campaign",
+        "body.advertiser_name": "The name of the advertiser associated with the offer",
+        "body.title/short_headline/short_description": "Basic metadata for how the offer should be displayed",
+        "body.offer_description": "Detailed explanation of the offer",
+        "body.terms_and_conditions": "Terms of the selected offer",
+        "body.click_url": "URL that leads to the offer landing page",
+        "body.cta_yes/cta_no": "The CTA text for positive/negative user actions",
+        "body.image/creatives": "Images and media creatives associated with the offer",
+        "body.mini_text": "Supplemental note for the user, often for compliance",
+        "body.pixel/adv_pixel_url": "Optional tracking pixels",
+        "body.save_for_later_url": "Link that allows users to access the offer again later",
+        "body.tags": "Optional categorization tags",
+        "body.pub_user_id": "The unique identifier for the user, provided by the publisher",
+        "body.selected": "Indicates whether the user selected any offers (1 for selected, 0 for none)",
+        "body.session_id": "The unique session identifier generated by the Moments SDK"
+      };
+
       const curlCommand = `curl -X POST '${endpoint}' \\
   -H 'Content-Type: application/json' \\
   -H 'Authorization: Bearer ${sessionData.apiKey}' \\
@@ -538,6 +651,7 @@ const SelectPerksPage = () => {
 
       console.log('Wrapping session:', { endpoint, requestBody })
       console.log('Wrap session cURL:', curlCommand)
+      console.log('Webhook payload example:', webhookPayload)
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -556,14 +670,31 @@ const SelectPerksPage = () => {
         timestamp: new Date().toISOString(),
         action: 'wrap_session',
         offer: { sessionId },
-        request: { endpoint, body: requestBody, curl: curlCommand },
+        request: { 
+          endpoint, 
+          body: requestBody, 
+          curl: curlCommand 
+        },
         response: responseData,
+        webhook: {
+          payload: webhookPayload,
+          description: webhookFieldDescriptions
+        },
         error: null
       }
       setSelectionLogs(prev => [logEntry, ...prev])
 
-      alert('Session wrapped successfully! Check the API logs for details.')
-
+      return {
+        success: true,
+        request: { 
+          endpoint, 
+          body: requestBody, 
+          curl: curlCommand 
+        },
+        response: responseData,
+        webhookPayload,
+        webhookFieldDescriptions
+      };
     } catch (error) {
       console.error('Error wrapping session:', error)
       
@@ -578,7 +709,20 @@ const SelectPerksPage = () => {
       }
       setSelectionLogs(prev => [logEntry, ...prev])
       
-      alert('Failed to wrap session. Check the API logs for details.')
+      return {
+        success: false,
+        request: { 
+          endpoint: `https://api-staging.adspostx.com/sdk/v4/usp/session/${sessionId}.json`,
+          body: {
+            key: sessionData?.apiKey,
+            pub_user_id: sessionData?.pubUserId,
+            action: 'wrap'
+          }
+        },
+        response: null,
+        webhookPayload: null,
+        webhookFieldDescriptions: null
+      };
     }
   }
 
@@ -594,7 +738,7 @@ const SelectPerksPage = () => {
     navigate('/')
   }
 
-  if (loading) {
+  if (loading || isPaymentProcessing) {
     return (
       <div className="loading-page-overlay">
         <div className="loading-container-modern">
@@ -611,13 +755,23 @@ const SelectPerksPage = () => {
             </div>
           </div>
           <div className="loading-content">
-            <h2 className="loading-title">Loading Your Perks</h2>
-            <p className="loading-subtitle">We're preparing your personalized offers...</p>
+            <h2 className="loading-title">
+              {isPaymentProcessing ? "Processing Your Payment" : "Loading Your Perks"}
+            </h2>
+            <p className="loading-subtitle">
+              {isPaymentProcessing 
+                ? "We're securely processing your transaction and registering your selected perks..." 
+                : "We're preparing your personalized offers..."}
+            </p>
             <div className="loading-progress">
               <div className="progress-bar">
                 <div className="progress-fill"></div>
               </div>
-              <span className="progress-text">Fetching offers from MomentScience API</span>
+              <span className="progress-text">
+                {isPaymentProcessing 
+                  ? "Completing your purchase and finalizing perks selection" 
+                  : "Fetching offers from MomentScience API"}
+              </span>
             </div>
           </div>
         </div>
@@ -1010,7 +1164,7 @@ const SelectPerksPage = () => {
                         </div>
                         
                         <div className="offer-cta">
-                          <div className="offer-checkbox-modern">
+                          <label className="offer-checkbox-modern" onClick={(e) => e.stopPropagation()}>
                             <input
                               key={`checkbox-${campaignId}-${isSelected}-${renderKey}`}
                               type="checkbox"
@@ -1018,28 +1172,21 @@ const SelectPerksPage = () => {
                               checked={isSelected}
                               onChange={(e) => {
                                 e.stopPropagation(); // Prevent triggering the card click
-                                console.log(`📝 Checkbox changed for campaign ${campaignId}:`, {
-                                  checked: e.target.checked,
-                                  previouslySelected: isSelected,
-                                  campaignId,
-                                  hasSession: !!sessionId,
-                                  hasSessionData: !!sessionData
-                                })
                                 if (campaignId) {
-                                  handleOfferSelection(campaignId, e.target.checked)
+                                  handleOfferSelection(campaignId, e.target.checked);
                                 } else {
-                                  console.warn('⚠️ No campaign ID for checkbox change')
+                                  console.warn('⚠️ No campaign ID for checkbox change');
                                 }
                               }}
                               disabled={!campaignId}
                             />
                             <div className="checkbox-custom">
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" fill="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </div>
                             <span className="cta-text">Email me this offer</span>
-                          </div>
+                          </label>
                         </div>
                       </div>
                     </div>

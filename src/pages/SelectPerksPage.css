@@ -2579,6 +2579,16 @@ html, body, #root {
   align-items: center;
   gap: var(--space-sm);
   position: relative;
+  padding: var(--space-xs) var(--space-sm);
+  background-color: var(--gray-50);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  border: 1px solid var(--gray-200);
+  transition: all 0.2s ease;
+}
+
+.offer-checkbox-modern:hover {
+  background-color: var(--gray-100);
 }
 
 .checkbox-input {
@@ -2592,10 +2602,11 @@ html, body, #root {
 }
 
 .checkbox-custom {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
   background: white;
-  border: 2px solid var(--gray-300);
+  border: 2px solid var(--primary-300);
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -2608,6 +2619,16 @@ html, body, #root {
   background: var(--primary-500);
   border-color: var(--primary-500);
   color: white;
+}
+
+.checkbox-input:checked ~ .cta-text {
+  color: var(--primary-700);
+  font-weight: 700;
+}
+
+.offer-card-modern.selected .offer-checkbox-modern {
+  background-color: var(--primary-50);
+  border-color: var(--primary-200);
 }
 
 .checkbox-input:not(:checked) + .checkbox-custom svg {
@@ -2644,12 +2665,16 @@ html, body, #root {
   align-items: center;
   padding-top: var(--space-md);
   border-top: 1px solid var(--gray-200);
+  flex-wrap: wrap;
+  gap: var(--space-md);
 }
 
 .advertiser-info {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .advertiser-avatar {
@@ -2683,6 +2708,8 @@ html, body, #root {
   color: var(--primary-600);
   font-weight: 600;
   margin-left: var(--space-xs);
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 /* No Offers State */

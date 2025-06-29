@@ -37,8 +37,8 @@ export const Tabs = ({ children, className = '' }: TabsProps) => {
 export const TabsList = ({ children, className = '' }: TabsListProps) => {
   return (
     <div 
-      className={`flex bg-gray-100 p-1 rounded-lg tabs-list ${className}`}
-      style={{ display: 'flex', background: '#f3f4f6', padding: '0.25rem', borderRadius: '0.5rem', marginBottom: '1rem', flexShrink: 0 }}
+      className={`flex bg-gray-100 p-1.5 rounded-lg tabs-list ${className}`}
+      style={{ display: 'flex', background: '#f1f5f9', padding: '0.375rem', borderRadius: '0.75rem', marginBottom: '1rem', flexShrink: 0, border: '1px solid #e2e8f0' }}
     >
       {children}
     </div>
@@ -64,9 +64,13 @@ export const TabsTrigger = ({ children, value, activeTab, onTabChange, className
         transition: 'background-color 0.2s, color 0.2s, box-shadow 0.2s',
         border: 'none',
         cursor: 'pointer',
-        background: isActive ? 'white' : 'none',
-        boxShadow: isActive ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none',
-        color: isActive ? '#2563eb' : '#4b5563'
+        background: isActive ? 'white' : 'transparent',
+        boxShadow: isActive ? '0 2px 4px rgba(0, 0, 0, 0.05)' : 'none',
+        color: isActive ? '#2563eb' : '#64748b',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.5rem'
       }}
       onClick={() => onTabChange(value)}
       onMouseEnter={(e) => {

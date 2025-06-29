@@ -1,0 +1,49 @@
+/* Thank You Page - Tailwind-only implementation */
+/* This file is now using pure Tailwind CSS classes */
+/* Only custom animations that Tailwind can't provide are included */
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes checkmarkDraw {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInUp {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Custom utility classes for complex animations */
+.animate-scale-in {
+  animation: scaleIn 0.6s ease-out;
+}
+
+.animate-checkmark-draw {
+  animation: checkmarkDraw 1s ease-out 0.3s both;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.8s ease-out;
+}
