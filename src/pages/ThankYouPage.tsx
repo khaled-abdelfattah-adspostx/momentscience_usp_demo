@@ -289,6 +289,30 @@ const ThankYouPage: React.FC = () => {
               </svg>
               Technical Integration Details
             </h3>
+
+            {/* Process Flow Overview */}
+            <div className="mb-8 bg-blue-50 rounded-xl p-6 border border-blue-200">
+              <h4 className="text-lg font-bold text-blue-900 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Payment Flow Process
+              </h4>
+              <div className="grid md:grid-cols-3 gap-4 text-sm">
+                <div className="bg-white p-4 rounded-lg border border-blue-200">
+                  <div className="font-medium text-blue-900 mb-2">1. Payment Processing</div>
+                  <div className="text-blue-700">User clicks "Secure Payment" and payment is processed</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-blue-200">
+                  <div className="font-medium text-blue-900 mb-2">2. Wrap Session API</div>
+                  <div className="text-blue-700">System calls wrap session endpoint to finalize user selections</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-blue-200">
+                  <div className="font-medium text-blue-900 mb-2">3. Webhook Delivery</div>
+                  <div className="text-blue-700">Selected offer data is sent to publisher's webhook endpoint</div>
+                </div>
+              </div>
+            </div>
             
             <div className="grid lg:grid-cols-2 gap-8">
               

@@ -509,9 +509,6 @@ const SelectPerksPage = () => {
       // Call wrap session API after successful payment
       const wrapResult = await wrapSession()
       
-      // Get the latest wrap session log entry for detailed information
-      const latestWrapSessionLog = selectionLogs.find(log => log.action === 'wrap_session')
-      
       // Navigate to thank you page with payment results and API details
       navigate('/thank-you', { 
         state: { 
