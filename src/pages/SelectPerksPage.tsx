@@ -1,6 +1,10 @@
 import { useEffect, useState, startTransition, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './SelectPerksPage.css'
+import EmbeddedSidebar from '../components/EmbeddedSidebar'
+import SidebarToggleButton from '../components/SidebarToggleButton'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/Tabs'
+import { LogEntry, SessionDetails, EmptyState } from '../components/LogComponents'
 
 interface SessionData {
   apiKey: string
@@ -35,6 +39,9 @@ const SelectPerksPage = () => {
   const [apiResponse, setApiResponse] = useState<any>(null)
   const [showSidebar, setShowSidebar] = useState(true)
   const [selectedOffers, setSelectedOffers] = useState<Set<string | number>>(new Set())
+
+  // Debug log for sidebar state
+  console.log('🔧 SelectPerksPage render - showSidebar:', showSidebar)
   const [selectionLogs, setSelectionLogs] = useState<{
     timestamp: string
     action: string
@@ -53,20 +60,7 @@ const SelectPerksPage = () => {
   const [autoSelectionHandled, setAutoSelectionHandled] = useState(false)
   const [renderKey, setRenderKey] = useState(0)
   const [forceAutoSelect] = useState(false)
-
-  // Helper function to get action descriptions
-  const getActionDescription = (action: string) => {
-    const descriptions: { [key: string]: string } = {
-      'fetch_offers': 'Calling the MomentScience API to fetch available offers for the user',
-      'select': 'The user selected a single offer to add to their preferences',
-      'unselect': 'The user unselected a single offer from their preferences',
-      'bulk_select_all': 'The user selected all available offers at once',
-      'bulk_unselect_all': 'The user unselected all offers at once',
-      'auto_select_all': 'Automatically selected all offers based on USP settings',
-      'wrap_session': 'Finalizing the session with selected offers and sending completion data to MomentScience'
-    }
-    return descriptions[action] || `API action: ${action.replace('_', ' ')}`
-  }
+  const [activeTab, setActiveTab] = useState('session')
 
   // Load session data from localStorage on component mount
   useEffect(() => {
@@ -85,7 +79,17 @@ const SelectPerksPage = () => {
         navigate('/')
       }
     } else {
-      navigate('/')
+      // TEMPORARY: Set demo session data for testing
+      const demoData = {
+        apiKey: 'demo-api-key-12345',
+        pubUserId: 'demo-user-123',
+        useDemoCredentials: true
+      }
+      console.log('🔧 No session data found, using demo data:', demoData)
+      setSessionData(demoData)
+      initialFetchDone.current = true
+      fetchOffers(demoData)
+      // navigate('/')
     }
   }, [navigate])
 
@@ -273,7 +277,25 @@ const SelectPerksPage = () => {
   }
 
   const handleOfferSelection = async (campaignId: number, isSelected: boolean) => {
-    if (!sessionData || !sessionId) return
+    console.log(`🎯 handleOfferSelection called:`, { campaignId, isSelected, sessionData: !!sessionData, sessionId })
+    
+    if (!sessionData || !sessionId) {
+      console.warn('⚠️ Missing session data or session ID for offer selection')
+      return
+    }
+
+    // Update local selection state immediately for better UX
+    setSelectedOffers(prev => {
+      const newSet = new Set(prev)
+      if (isSelected) {
+        newSet.add(campaignId)
+        console.log(`✅ Added ${campaignId} to selection. New size: ${newSet.size}`)
+      } else {
+        newSet.delete(campaignId)
+        console.log(`❌ Removed ${campaignId} from selection. New size: ${newSet.size}`)
+      }
+      return newSet
+    })
 
     const action = isSelected ? 'select' : 'unselect'
     const offer = offers.find(o => o.campaign_id === campaignId)
@@ -305,15 +327,6 @@ const SelectPerksPage = () => {
       const responseData = await response.json()
       console.log(`${action} response:`, responseData)
 
-      // Update local selection state
-      const newSelectedOffers = new Set(selectedOffers)
-      if (isSelected) {
-        newSelectedOffers.add(campaignId)
-      } else {
-        newSelectedOffers.delete(campaignId)
-      }
-      setSelectedOffers(newSelectedOffers)
-
       // Add to selection logs
       const logEntry = {
         timestamp: new Date().toISOString(),
@@ -327,6 +340,19 @@ const SelectPerksPage = () => {
 
     } catch (error) {
       console.error(`Error ${action}ing offer:`, error)
+      
+      // Revert the state change on error
+      setSelectedOffers(prev => {
+        const revertSet = new Set(prev)
+        if (isSelected) {
+          revertSet.delete(campaignId) // Remove if we tried to add
+          console.log(`🔄 Reverted add for ${campaignId}. New size: ${revertSet.size}`)
+        } else {
+          revertSet.add(campaignId) // Add back if we tried to remove
+          console.log(`🔄 Reverted remove for ${campaignId}. New size: ${revertSet.size}`)
+        }
+        return revertSet
+      })
       
       // Add error to selection logs
       const logEntry = {
@@ -570,11 +596,29 @@ const SelectPerksPage = () => {
 
   if (loading) {
     return (
-      <div className="select-perks-page">
-        <div className="container">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Loading offers...</p>
+      <div className="loading-page-overlay">
+        <div className="loading-container-modern">
+          <div className="loading-animation">
+            <div className="loading-dots">
+              <div className="dot"></div>
+              <div className="dot"></div>
+              <div className="dot"></div>
+            </div>
+            <div className="loading-pulse-ring">
+              <div className="pulse-ring"></div>
+              <div className="pulse-ring delay-1"></div>
+              <div className="pulse-ring delay-2"></div>
+            </div>
+          </div>
+          <div className="loading-content">
+            <h2 className="loading-title">Loading Your Perks</h2>
+            <p className="loading-subtitle">We're preparing your personalized offers...</p>
+            <div className="loading-progress">
+              <div className="progress-bar">
+                <div className="progress-fill"></div>
+              </div>
+              <span className="progress-text">Fetching offers from MomentScience API</span>
+            </div>
           </div>
         </div>
       </div>
@@ -583,16 +627,29 @@ const SelectPerksPage = () => {
 
   if (error) {
     return (
-      <div className="select-perks-page">
-        <div className="container">
-          <div className="error-message">
-            <h4>Error Loading Offers</h4>
-            <p>{error}</p>
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <button onClick={handleRetry} className="retry-button">
+      <div className="error-page-overlay">
+        <div className="error-container-modern">
+          <div className="error-icon-modern">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+              <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" strokeWidth="2"/>
+              <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+          </div>
+          <div className="error-content-modern">
+            <h2 className="error-title-modern">Unable to Load Offers</h2>
+            <p className="error-description-modern">{error}</p>
+            <div className="error-actions-modern">
+              <button onClick={handleRetry} className="btn-primary-modern">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M1 4V10H7M23 20V14H17M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14L18.36 18.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 Try Again
               </button>
-              <button onClick={handleGoHome} className="secondary-button">
+              <button onClick={handleGoHome} className="btn-secondary-modern">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M19 12H5M12 19L5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 Go Back Home
               </button>
             </div>
@@ -603,520 +660,684 @@ const SelectPerksPage = () => {
   }
 
   return (
-    <div className={`select-perks-page ${showSidebar ? 'sidebar-open' : ''}`}>
-      {/* Combined API Response Tracking and Session Details Right Sidebar */}
-      {showSidebar && (
-        <div className="api-sidebar">
-          <div className="sidebar-header">
-            <div className="sidebar-title-section">
-              <h3>🔧 Technical Dashboard</h3>
-              <span className="sidebar-subtitle">API Monitoring & Session Details</span>
-            </div>
-            <button
-              onClick={() => setShowSidebar(false)}
-              className="close-sidebar"
-            >
-              ×
-            </button>
-          </div>
-          <div className="sidebar-content">
-            {/* Session Details Section */}
-            <div className="session-details-section">
-              <div className="current-session-info">
-                <h4>Current Session</h4>
-                <div className="session-detail-item">
-                  <strong>Session ID:</strong>
-                  <span className="session-id">{sessionId || 'Not available'}</span>
-                </div>
-                <div className="session-detail-item">
-                  <strong>Offer Count:</strong>
-                  <span>{offers.length}</span>
-                </div>
-                <div className="session-detail-item">
-                  <strong>Selected:</strong>
-                  <span>{selectedOffers.size}</span>
-                </div>
-              </div>
+    <div 
+      className="select-perks-page"
+      style={{ 
+        display: 'flex', 
+        minHeight: '100vh', 
+        height: '100vh',
+        background: '#f9fafb',
+        position: 'relative' // For fixed sidebar positioning
+      }}
+    >
+      {/* Floating Toggle Button */}
+      <SidebarToggleButton 
+        isOpen={showSidebar} 
+        onToggle={() => setShowSidebar(!showSidebar)} 
+        position="right"
+      />
 
-              <button
-                onClick={getSessionDetails}
-                disabled={sessionDetailsLoading || !sessionId}
-                className="session-details-button"
-              >
-                {sessionDetailsLoading ? 'Loading...' : 'Get Session Details'}
-              </button>
-            </div>
-
-            {/* Session Details Logs */}
-            {sessionDetailsLogs.length > 0 && (
-              <div className="session-details-logs">
-                <h4>Session API Calls</h4>
-                {sessionDetailsLogs.map((log, index) => (
-                  <div key={index} className="log-entry">
-                    <div className="log-header">
-                      <div className="log-timestamp">{new Date(log.timestamp).toLocaleTimeString()}</div>
-                      {log.error && <div className="log-error">ERROR</div>}
-                    </div>
-                    <div className="log-content">
-                      {log.request && (
-                        <div className="request-section">
-                          <h5>Request</h5>
-                          {log.request.curl && (
-                            <div className="curl-command">
-                              <strong>cURL:</strong>
-                              <pre>{log.request.curl}</pre>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {log.response && (
-                        <div className="response-section">
-                          <h5>Response</h5>
-                          <div className="response-data">
-                            <pre>{JSON.stringify(log.response, null, 2)}</pre>
-                          </div>
-                        </div>
-                      )}
-                      {log.error && (
-                        <div className="error-section">
-                          <h5>Error</h5>
-                          <div className="log-error">{log.error}</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Selection/API Logs */}
-            <div className="selection-logs-container">
-              <div className="logs-header">
-                <h4>📊 Selection API Activity</h4>
-                <div className="logs-stats">
-                  <span className="stat-badge">{selectionLogs.length} Events</span>
-                  <span className="stat-badge success">{selectionLogs.filter(log => !log.error).length} Success</span>
-                  {selectionLogs.filter(log => log.error).length > 0 && (
-                    <span className="stat-badge error">{selectionLogs.filter(log => log.error).length} Errors</span>
-                  )}
-                </div>
-              </div>
-              {selectionLogs.length > 0 ? (
-                <div className="selection-logs">
-                  <div className="selection-logs-content">
-                    {selectionLogs.map((log, index) => (
-                      <div key={index} className={`log-entry ${log.error ? 'error' : 'success'}`}>
-                        <div className="log-header">
-                          <div className="log-action-wrapper">
-                            <div className={`log-action ${log.action}`}>
-                              <span className="action-icon">
-                                {log.action === 'fetch_offers' && '📥'}
-                                {log.action === 'select' && '✅'}
-                                {log.action === 'unselect' && '❌'}
-                                {log.action.includes('bulk') && '📋'}
-                                {log.action.includes('auto') && '🤖'}
-                                {log.action === 'wrap_session' && '🎁'}
-                              </span>
-                              {log.action.replace('_', ' ').toUpperCase()}
-                            </div>
-                            <div className="log-status">
-                              {log.error ? (
-                                <span className="status-error">❌ Failed</span>
-                              ) : (
-                                <span className="status-success">✅ Success</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="log-time">{new Date(log.timestamp).toLocaleTimeString()}</div>
-                        </div>
-                        
-                        {/* Action Description */}
-                        <div className="log-description">
-                          <span className="description-icon">💬</span>
-                          {getActionDescription(log.action)}
-                        </div>
-                        
-                        {log.offer && (
-                          <div className="log-offer">
-                            <span className="offer-icon">🎯</span>
-                            {log.action.includes('bulk') || log.action.includes('auto_select') ? 
-                              `${log.offer.count} offers processed` : 
-                              (log.offer.title || log.offer.headline || 
-                               (log.offer.campaign_id ? `Campaign #${log.offer.campaign_id}` : 'Unknown offer'))}
-                          </div>
-                        )}
-
-                        {log.request && (
-                          <div className="log-request">
-                            <details>
-                              <summary>Request Details</summary>
-                              <div className="request-details">
-                            {log.request.endpoint && <div><strong>Endpoint:</strong> {log.request.endpoint}</div>}
-                            {log.request.body && (
-                              <div className="request-body">
-                                <strong>Body:</strong>
-                                <pre>{JSON.stringify(log.request.body, null, 2)}</pre>
-                              </div>
-                            )}
-                            {log.request.curl && (
-                              <div className="curl-command">
-                                <strong>cURL:</strong>
-                                <pre>{log.request.curl}</pre>
-                              </div>
-                            )}
-                          </div>
-                        </details>
-                      </div>
-                    )}
-
-                    {log.response && (
-                      <div className="log-response">
-                        <details>
-                          <summary>Response Data</summary>
-                          <div className="response-data">
-                            <pre>{JSON.stringify(log.response, null, 2)}</pre>
-                          </div>
-                        </details>
-                      </div>
-                    )}
-
-                    {log.error && (
-                      <div className="log-error">
-                        <strong>Error:</strong> {log.error}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="no-response">
-                  <div className="empty-state">
-                    <div className="empty-icon">📊</div>
-                    <h4>No API Activity Yet</h4>
-                    <p>Start selecting offers to see real-time API tracking information here.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="container">
-        {/* Checkout Page Header */}
-        <div className="order-header">
-          <div className="checkout-icon">🛒</div>
-          <h1 className="order-title">Complete Your Purchase</h1>
-          <p className="order-subtitle">Review your order and select any bonus offers that interest you</p>
-          <div className="order-number">Session ID: {sessionId || 'Initializing...'}</div>
-          
-          <div className="header-actions">
-            <button
-              onClick={() => setShowSidebar(!showSidebar)}
-              className="debug-button"
-            >
-              {showSidebar ? 'Hide' : 'Show'} Technical Details
-            </button>
-          </div>
-        </div>
-
-        {/* Cart Summary Section */}
-        <div className="order-summary-section">
-          <div className="order-summary-card">
-            <h3>� Your Cart</h3>
-            <div className="order-items">
-              <div className="order-item">
-                <div className="item-image">
-                  <img src="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=80&h=80&fit=crop&crop=center" alt="Premium Subscription" />
-                </div>
-                <div className="item-details">
-                  <span className="item-name">Premium Subscription</span>
-                  <span className="item-description">Monthly Plan • Full Access</span>
-                  <span className="item-sku">SKU: PREM-001</span>
-                </div>
-                <div className="item-price">$29.99</div>
-              </div>
-              <div className="order-item">
-                <div className="item-image">
-                  <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=80&h=80&fit=crop&crop=center" alt="Analytics Package" />
-                </div>
-                <div className="item-details">
-                  <span className="item-name">Advanced Analytics</span>
-                  <span className="item-description">Pro Dashboard • Real-time Data</span>
-                  <span className="item-sku">SKU: ANLY-002</span>
-                </div>
-                <div className="item-price">$9.99</div>
-              </div>
-              <div className="order-item">
-                <div className="item-image">
-                  <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=80&h=80&fit=crop&crop=center" alt="Support Package" />
-                </div>
-                <div className="item-details">
-                  <span className="item-name">Priority Support</span>
-                  <span className="item-description">24/7 Chat • Phone Support</span>
-                  <span className="item-sku">SKU: SUPP-003</span>
-                </div>
-                <div className="item-price">$4.99</div>
-              </div>
-              <div className="order-subtotal">
-                <div className="subtotal-label">Subtotal</div>
-                <div className="subtotal-price">$44.97</div>
-              </div>
-              <div className="order-discount">
-                <div className="discount-label">First-time Customer Discount</div>
-                <div className="discount-price">-$5.00</div>
-              </div>
-              <div className="order-total">
-                <div className="total-label">Total</div>
-                <div className="total-price">$39.97</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment & Customer Information */}
-          <div className="delivery-info-card">
-            <h3>� Payment Information</h3>
-            <div className="delivery-details">
-              <div className="payment-method">
-                <h4>Payment Method</h4>
-                <div className="payment-option selected">
-                  <div className="payment-icon">💳</div>
-                  <div className="payment-details">
-                    <span className="payment-type">Credit Card</span>
-                    <span className="payment-info">•••• •••• •••• 1234</span>
-                  </div>
-                  <div className="payment-status">✓</div>
-                </div>
+      {/* Main Content Area */}
+      <div 
+        className="main-content"
+        style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column',
+          minWidth: 0, // Important for flex shrinking
+          height: '100vh',
+          overflowY: 'auto', // Allow main content to scroll
+          marginRight: showSidebar ? '480px' : '0px', // Account for fixed sidebar
+          transition: 'margin-right 0.3s ease-out'
+        }}
+      >
+        <div className="container" style={{ maxWidth: 'none', padding: '2rem', flex: 1 }}>
+          {/* Modern Page Header */}
+          <div className="page-header">
+            <div className="header-content">
+              <div className="status-badge">
+                <div className="status-indicator"></div>
+                <span>Session Active</span>
               </div>
               
-              <div className="customer-info">
-                <h4>Billing Details</h4>
-                <div className="detail-row">
-                  <span className="detail-label">📧 Email:</span>
-                  <span className="detail-value">customer@example.com</span>
+              <h1 className="page-title">Complete Your Purchase</h1>
+              <p className="page-description">
+                Review your order and add any bonus offers that catch your interest. 
+                All selected offers will be delivered to your email after purchase.
+              </p>
+              
+              <div className="session-info">
+                <div className="session-item">
+                  <span className="session-label">Session ID</span>
+                  <span className="session-value">{sessionId || 'Initializing...'}</span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">👤 User ID:</span>
-                  <span className="detail-value">{sessionData?.pubUserId || 'demo-user-123'}</span>
+                <div className="session-item">
+                  <span className="session-label">User ID</span>
+                  <span className="session-value">{sessionData?.pubUserId || 'demo-user-123'}</span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">🔗 Session:</span>
-                  <span className="detail-value session-id">{sessionId || 'Initializing...'}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">📅 Date:</span>
-                  <span className="detail-value">{new Date().toLocaleDateString()}</span>
+                <div className="session-item">
+                  <span className="session-label">Date</span>
+                  <span className="session-value">{new Date().toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
+            
+            <div className="header-actions">
+              <button
+                onClick={() => setShowSidebar(!showSidebar)}
+                className={`tech-toggle-btn ${showSidebar ? 'active' : ''}`}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span>Technical Dashboard</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Auto-selection notification */}
+          {/* Modern Cart Summary Section */}
+          <div className="checkout-layout">
+            <div className="checkout-main">
+              {/* Order Summary Card */}
+              <div className="order-summary-modern">
+                <div className="summary-header">
+                  <h2 className="summary-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <path d="M7 4V2C7 1.45 7.45 1 8 1H16C16.55 1 17 1.45 17 2V4H20C20.55 4 21 4.45 21 5S20.55 6 20 6H19V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V6H4C3.45 6 3 5.55 3 5S3.45 4 4 4H7ZM9 3V4H15V3H9ZM7 6V19H17V6H7Z" fill="currentColor"/>
+                    </svg>
+                    Your Order
+                  </h2>
+                  <div className="summary-badge">3 items</div>
+                </div>
+                
+                <div className="order-items-modern">
+                  <div className="order-item-modern">
+                    <div className="item-image-modern">
+                      <img src="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=80&h=80&fit=crop&crop=center" alt="Premium Subscription" />
+                    </div>
+                    <div className="item-details-modern">
+                      <h4 className="item-name-modern">Premium Subscription</h4>
+                      <p className="item-description-modern">Monthly Plan • Full Access</p>
+                      <span className="item-sku-modern">SKU: PREM-001</span>
+                    </div>
+                    <div className="item-price-modern">$29.99</div>
+                  </div>
+                  
+                  <div className="order-item-modern">
+                    <div className="item-image-modern">
+                      <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=80&h=80&fit=crop&crop=center" alt="Analytics Package" />
+                    </div>
+                    <div className="item-details-modern">
+                      <h4 className="item-name-modern">Advanced Analytics</h4>
+                      <p className="item-description-modern">Pro Dashboard • Real-time Data</p>
+                      <span className="item-sku-modern">SKU: ANLY-002</span>
+                    </div>
+                    <div className="item-price-modern">$9.99</div>
+                  </div>
+                  
+                  <div className="order-item-modern">
+                    <div className="item-image-modern">
+                      <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=80&h=80&fit=crop&crop=center" alt="Support Package" />
+                    </div>
+                    <div className="item-details-modern">
+                      <h4 className="item-name-modern">Priority Support</h4>
+                      <p className="item-description-modern">24/7 Chat • Phone Support</p>
+                      <span className="item-sku-modern">SKU: SUPP-003</span>
+                    </div>
+                    <div className="item-price-modern">$4.99</div>
+                  </div>
+                </div>
+                
+                <div className="order-totals-modern">
+                  <div className="total-row">
+                    <span className="total-label">Subtotal</span>
+                    <span className="total-value">$44.97</span>
+                  </div>
+                  <div className="total-row discount">
+                    <span className="total-label">First-time Customer Discount</span>
+                    <span className="total-value">-$5.00</span>
+                  </div>
+                  <div className="total-row final">
+                    <span className="total-label">Total</span>
+                    <span className="total-value">$39.97</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Payment & Customer Information Sidebar */}
+            <div className="checkout-sidebar">
+              <div className="payment-info-modern">
+                <h3 className="payment-title">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 18H4V12H20V18ZM20 8H4V6H20V8Z" fill="currentColor"/>
+                  </svg>
+                  Payment Method
+                </h3>
+                <div className="payment-method-modern">
+                  <div className="payment-card">
+                    <div className="card-icon">💳</div>
+                    <div className="card-details">
+                      <span className="card-type">Credit Card</span>
+                      <span className="card-number">•••• •••• •••• 1234</span>
+                    </div>
+                    <div className="card-status">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#22c55e">
+                        <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="customer-details">
+                  <h4 className="details-title">Billing Information</h4>
+                  <div className="detail-grid">
+                    <div className="detail-item">
+                      <div className="detail-icon">📧</div>
+                      <div className="detail-content">
+                        <span className="detail-label">Email</span>
+                        <span className="detail-value">customer@example.com</span>
+                      </div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-icon">👤</div>
+                      <div className="detail-content">
+                        <span className="detail-label">User ID</span>
+                        <span className="detail-value">{sessionData?.pubUserId || 'demo-user-123'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>        {/* Smart Auto-selection notification */}
         {autoSelectionHandled && (apiResponse?.data?.settings?.usp_all_offers_checked || forceAutoSelect || true) && (
-          <div className="auto-selection-banner">
+          <div className="smart-banner">
             <div className="banner-content">
-              <div className="banner-icon">⚙️</div>
+              <div className="banner-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
               <div className="banner-text">
-                <strong>Auto-Selection Applied:</strong> Based on your defined settings in the MomentScience integration page where you indicated that "USP All Offers Should Be Checked" is set to <code>true</code>, all available offers have been automatically selected and sent to the session API using the selected campaign IDs (without the key parameter in the request body).
-                {forceAutoSelect && <span className="banner-note"> (Manually triggered for testing)</span>}
-                {!apiResponse?.data?.settings?.usp_all_offers_checked && !forceAutoSelect && <span className="banner-note"> (Demo mode - forced auto-selection enabled for testing purposes)</span>}
-              </div>
-            </div>
-            <div className="banner-details">
-              <div className="setting-info">
-                <span className="setting-label">Integration Setting:</span>
-                <code className="setting-value">usp_all_offers_checked = true</code>
-              </div>
-              <div className="offers-info">
-                <span className="offers-label">Result:</span>
-                <span className="offers-count">{selectedOffers.size} of {offers.length} offers automatically selected</span>
+                <h4 className="banner-title">Auto-Selection Active</h4>
+                <p className="banner-description">
+                  {selectedOffers.size} of {offers.length} offers selected automatically based on MomentScience integration settings
+                </p>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Bonus Offers Section - Checkout Context */}
-        <div className="offers-checkout-section">
-          <div className="offers-section-header">
-            <h3>
-              <span className="offers-icon">🎁</span>
-              Add Bonus Offers to Your Order
-            </h3>
-            <p className="offers-description">
-              Before you complete your purchase, check out these personalized offers we've selected just for you. 
-              Select any that interest you and we'll include them in your order confirmation email - completely free!
-            </p>
-            <div className="offers-benefits">
-              <span className="benefit-badge">✅ Handpicked for you</span>
-              <span className="benefit-badge">✅ Free with purchase</span>
-              <span className="benefit-badge">✅ Email delivery</span>
+        )}        {/* Modern Bonus Offers Section */}
+        <div className="offers-section-modern">
+          <div className="offers-header-modern">
+            <div className="header-content">
+              <h2 className="offers-title">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L15.09 8.26L22 9L17 14.74L18.18 21.02L12 17.77L5.82 21.02L7 14.74L2 9L8.91 8.26L12 2Z" fill="currentColor"/>
+                </svg>
+                Exclusive Rewards Unlocked!
+              </h2>
+              <p className="offers-subtitle">
+                Congratulations! Your order has unlocked these premium bonus offers exclusively for you. Select any that catch your interest and they'll be delivered to your email along with your order confirmation after payment. No extra cost – these rewards are our gift to you!
+              </p>
             </div>
-          </div>
-
-          {offers.length > 0 ? (
-            <div className="embedded-offers-section">
-              <div className="offers-header">
-                <div className="offers-stats">
-                  <span className="offers-count">{offers.length} Available Offers</span>
-                  <span className="offers-selected">{selectedOffers.size} Selected</span>
+            
+            <div className="offers-badges">
+              <div className="feature-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" fill="currentColor"/>
+                </svg>
+                <span>Personally Selected</span>
+              </div>
+              <div className="feature-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L13.09 8.26L22 9L13.09 15.74L12 22L10.91 15.74L2 9L10.91 8.26L12 2Z" fill="currentColor"/>
+                </svg>
+                <span>Absolutely Free</span>
+              </div>
+              <div className="feature-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 4H20C21.1 4 22 4.9 22 6V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6C2 4.9 2.9 4 4 4ZM20 8H4V6H20V8ZM4 18H20V10H4V18Z" fill="currentColor"/>
+                </svg>
+                <span>Instant Email Delivery</span>
+              </div>
+              <div className="feature-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27Z" fill="currentColor"/>
+                </svg>
+                <span>Premium Value</span>
+              </div>
+            </div>
+          </div>          {offers.length > 0 ? (
+            <div className="offers-container-modern">
+              <div className="offers-controls">
+                <div className="offers-stats-modern">
+                  <div className="stat-card">
+                    <span className="stat-number">{offers.length}</span>
+                    <span className="stat-label">Available Offers</span>
+                  </div>
+                  <div className="stat-card selected">
+                    <span className="stat-number">{selectedOffers.size}</span>
+                    <span className="stat-label">Selected</span>
+                  </div>
                 </div>
-                <div className="bulk-actions">
+                
+                <div className="offers-actions">
                   <button
                     onClick={() => handleBulkSelection(true)}
                     disabled={selectedOffers.size === offers.length}
-                    className="bulk-button select-all"
+                    className="action-btn primary"
                   >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     Select All
                   </button>
                   <button
                     onClick={() => handleBulkSelection(false)}
                     disabled={selectedOffers.size === 0}
-                    className="bulk-button unselect-all"
+                    className="action-btn secondary"
                   >
-                    Unselect All
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Clear All
                   </button>
                 </div>
               </div>
 
-            <div className="offers-grid" key={`grid-${renderKey}-${selectedOffers.size}`}>
-              {offers.map((offer, index) => {
-                const campaignId = offer.campaign_id
-                const isSelected = campaignId ? selectedOffers.has(campaignId) : false
+              <div className="offers-grid-modern" key={`grid-${renderKey}-${selectedOffers.size}`}>
+                {offers.map((offer, index) => {
+                  const campaignId = offer.campaign_id
+                  const isSelected = campaignId ? selectedOffers.has(campaignId) : false
+                  
+                  // Enhanced debug logging for auto-selection
+                  console.log(`🔍 Render offer ${index + 1}:`, { 
+                    campaignId, 
+                    isSelected, 
+                    selectedOffersSize: selectedOffers.size,
+                    hasInSet: campaignId ? selectedOffers.has(campaignId) : 'no-id',
+                    autoSelectionHandled,
+                    renderKey
+                  })
                 
-                // Enhanced debug logging for auto-selection
-                console.log(`🔍 Render offer ${index + 1}:`, { 
-                  campaignId, 
-                  isSelected, 
-                  selectedOffersSize: selectedOffers.size,
-                  hasInSet: campaignId ? selectedOffers.has(campaignId) : 'no-id',
-                  autoSelectionHandled,
-                  renderKey
-                })
-
                 return (
                   <div
                     key={`offer-${offer.id || offer.campaign_id}-${isSelected}-${renderKey}`}
-                    className={`offer-card ${isSelected ? 'selected' : ''}`}
+                    className={`offer-card-modern ${isSelected ? 'selected' : ''}`}
+                    onClick={() => {
+                      if (campaignId) {
+                        handleOfferSelection(campaignId, !isSelected);
+                      } else {
+                        console.warn('⚠️ No campaign ID for offer click');
+                      }
+                    }}
                   >
-                    {/* Offer Image */}
-                    <div className="offer-image">
-                      {(offer.image || offer.creative || offer.logo) ? (
-                        <img 
-                          src={offer.image || offer.creative || offer.logo} 
-                          alt={offer.title || offer.headline || 'Offer'} 
-                        />
-                      ) : (
-                        <div className="offer-image-placeholder">
-                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M21 19V5C21 3.9 20.1 3 19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19ZM8.5 13.5L11 16.51L14.5 12L19 18H5L8.5 13.5Z" fill="#9CA3AF"/>
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Offer Content */}
-                    <div className="offer-content">
-                      <h4 className="offer-title">
-                        {offer.title || offer.headline || 'Untitled Offer'}
-                      </h4>
-                      <p className="offer-description">
-                        {offer.description || offer.short_description || 'No description available'}
-                      </p>
-                      <div className="offer-meta">
-                        <span className="advertiser-name">
-                          {offer.advertiser_name || 'Unknown Advertiser'}
-                        </span>
+                    <div className="offer-card-header">
+                      <div className="offer-image-modern">
+                        {(offer.image || offer.creative || offer.logo) ? (
+                          <img 
+                            src={offer.image || offer.creative || offer.logo} 
+                            alt={offer.title || offer.headline || 'Offer'} 
+                          />
+                        ) : (
+                          <div className="offer-image-placeholder-modern">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                              <path d="M21 19V5C21 3.9 20.1 3 19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19ZM8.5 13.5L11 16.51L14.5 12L19 18H5L8.5 13.5Z" fill="currentColor"/>
+                            </svg>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Offer Actions */}
-                    <div className="offer-actions">
-                      <label className="offer-checkbox-label">
-                        <input
-                          key={`checkbox-${campaignId}-${isSelected}-${renderKey}`}
-                          type="checkbox"
-                          className="offer-checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            console.log(`📝 Checkbox changed for campaign ${campaignId}:`, e.target.checked)
-                            campaignId && handleOfferSelection(campaignId, e.target.checked)
-                          }}
-                          disabled={!campaignId}
-                        />
-                        <span className="offer-cta">
-                          Email me this offer
-                        </span>
-                      </label>
+                    <div className="offer-content-modern">
+                      <h3 className="offer-title-modern">
+                        {offer.title || offer.headline || 'Untitled Offer'}
+                      </h3>
+                      <p className="offer-description-modern">
+                        {offer.description || offer.short_description || 'No description available'}
+                      </p>
+                      
+                      <div className="offer-footer">
+                        <div className="advertiser-info">
+                          <div className="advertiser-avatar">
+                            {(offer.advertiser_name || 'Unknown Advertiser').charAt(0)}
+                          </div>
+                          <span className="advertiser-name">
+                            {offer.advertiser_name || 'Unknown Advertiser'}
+                          </span>
+                        </div>
+                        
+                        <div className="offer-cta">
+                          <div className="offer-checkbox-modern">
+                            <input
+                              key={`checkbox-${campaignId}-${isSelected}-${renderKey}`}
+                              type="checkbox"
+                              className="checkbox-input"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                e.stopPropagation(); // Prevent triggering the card click
+                                console.log(`📝 Checkbox changed for campaign ${campaignId}:`, {
+                                  checked: e.target.checked,
+                                  previouslySelected: isSelected,
+                                  campaignId,
+                                  hasSession: !!sessionId,
+                                  hasSessionData: !!sessionData
+                                })
+                                if (campaignId) {
+                                  handleOfferSelection(campaignId, e.target.checked)
+                                } else {
+                                  console.warn('⚠️ No campaign ID for checkbox change')
+                                }
+                              }}
+                              disabled={!campaignId}
+                            />
+                            <div className="checkbox-custom">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </div>
+                            <span className="cta-text">Email me this offer</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                  )
+                })}            </div>
             </div>
           ) : (
-            <div className="no-offers">
-              <h4>No Offers Available</h4>
-              <p>No offers were returned from the API. This might be due to targeting constraints or configuration issues.</p>
+            <div className="no-offers-modern">
+              <div className="no-offers-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                  <path d="M20 7L12 3L4 7M20 7L12 11M20 7V17L12 21M12 11L4 7M12 11V21M4 7V17L12 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <h3 className="no-offers-title">No Bonus Offers Available</h3>
+              <p className="no-offers-description">
+                No additional offers are available at this time. This might be due to targeting constraints or configuration settings.
+              </p>
             </div>
           )}
         </div>
 
-        {/* Checkout Section */}
-        <div className="checkout-section">
-          <div className="checkout-header">
-            <h3>💳 Complete Your Purchase</h3>
-            <p>Ready to proceed? Click the button below to complete your order.</p>
-          </div>
-          
-          <div className="checkout-summary">
-            <div className="summary-item">
-              <span className="summary-label">Cart Total:</span>
-              <span className="summary-value">$39.97</span>
+        {/* Modern Checkout Section */}
+        <div className="checkout-section-modern">
+          <div className="checkout-final-card">
+            <div className="checkout-header-modern">
+              <h2 className="checkout-title">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Complete Your Purchase
+              </h2>
+              <p className="checkout-subtitle">Ready to finalize your order? Review the summary below and proceed when ready.</p>
             </div>
-            <div className="summary-item">
-              <span className="summary-label">Bonus Offers Selected:</span>
-              <span className="summary-value">{selectedOffers.size} offers</span>
+            
+            <div className="checkout-summary-modern">
+              <div className="summary-grid">
+                <div className="summary-item-modern">
+                  <div className="summary-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path d="M7 4V2C7 1.45 7.45 1 8 1H16C16.55 1 17 1.45 17 2V4H20C20.55 4 21 4.45 21 5S20.55 6 20 6H19V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V6H4C3.45 6 3 5.55 3 5S3.45 4 4 4H7ZM9 3V4H15V3H9ZM7 6V19H17V6H7Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div className="summary-content">
+                    <span className="summary-label">Cart Total</span>
+                    <span className="summary-value">$39.97</span>
+                  </div>
+                </div>
+                
+                <div className="summary-item-modern">
+                  <div className="summary-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2L13.09 8.26L22 9L13.09 15.74L12 22L10.91 15.74L2 9L10.91 8.26L12 2Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div className="summary-content">
+                    <span className="summary-label">Bonus Offers</span>
+                    <span className="summary-value">{selectedOffers.size} selected</span>
+                  </div>
+                </div>
+                
+                <div className="summary-item-modern final">
+                  <div className="summary-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 18H4V12H20V18ZM20 8H4V6H20V8Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div className="summary-content">
+                    <span className="summary-label">Total to Pay</span>
+                    <span className="summary-value">$39.97</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="summary-item total">
-              <span className="summary-label">Total to Pay:</span>
-              <span className="summary-value">$39.97</span>
+            
+            <div className="checkout-actions-modern">
+              <button onClick={handleGoHome} className="btn-secondary-modern">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M19 12H5M12 19L5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Continue Shopping
+              </button>
+              
+              <button onClick={handleRetry} className="btn-tertiary-modern">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M1 4V10H7M23 20V14H17M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14L18.36 18.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Refresh Offers
+              </button>
+              
+              <button
+                onClick={handlePayment}
+                disabled={loading || !sessionId}
+                className="btn-primary-modern"
+              >
+                {loading ? (
+                  <>
+                    <div className="btn-loading-spinner">
+                      <div className="spinner-dots">
+                        <div className="dot"></div>
+                        <div className="dot"></div>
+                        <div className="dot"></div>
+                      </div>
+                    </div>
+                    Processing Payment...
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Secure Payment - $39.97
+                  </>
+                )}
+              </button>
             </div>
-          </div>
-          
-          <div className="checkout-actions">
-            <button onClick={handleGoHome} className="secondary-button">
-              ← Continue Shopping
-            </button>
-            <button onClick={handleRetry} className="tertiary-button">
-              Refresh Offers
-            </button>
-            <button
-              onClick={handlePayment}
-              disabled={loading || !sessionId}
-              className="pay-button"
-            >
-              {loading ? (
-                <>
-                  <span className="loading-spinner"></span>
-                  Processing Payment...
-                </>
-              ) : (
-                <>
-                  🔒 Pay $39.97 Now
-                </>
-              )}
-            </button>
-          </div>
-          
-          <div className="checkout-note">
-            <p>
-              🔒 Your payment is secure and protected. Selected offers will be sent to your email after payment.
-            </p>
+            
+            <div className="security-notice">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 22S8 18 8 13V6L12 4L16 6V13C16 18 12 22 12 22Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span>Your payment is secure and protected. Selected offers will be delivered to your email after purchase.</span>
+            </div>
           </div>
         </div>
-      </div>
+        </div> {/* End container */}
+      </div> {/* End main-content */}
+
+      {/* Fixed Embedded Technical Sidebar */}
+      <EmbeddedSidebar
+        isOpen={showSidebar}
+        onToggle={() => setShowSidebar(!showSidebar)}
+        title="🔧 Technical Dashboard"
+        subtitle="API Monitoring & Session Details"
+        position="right"
+      >
+        <Tabs>
+          <TabsList className="mb-4">
+            <TabsTrigger 
+              value="session" 
+              activeTab={activeTab} 
+              onTabChange={setActiveTab}
+            >
+              📊 Session
+            </TabsTrigger>
+            <TabsTrigger 
+              value="api-logs" 
+              activeTab={activeTab} 
+              onTabChange={setActiveTab}
+            >
+              📋 API Logs
+            </TabsTrigger>
+            <TabsTrigger 
+              value="session-api" 
+              activeTab={activeTab} 
+              onTabChange={setActiveTab}
+            >
+              🔍 Session API
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="session" activeTab={activeTab}>
+            <SessionDetails
+              sessionId={sessionId}
+              offerCount={offers.length}
+              selectedCount={selectedOffers.size}
+              onGetDetails={() => {
+                getSessionDetails()
+                // Navigate to Session API tab after getting details
+                setActiveTab('session-api')
+              }}
+              loading={sessionDetailsLoading}
+            />
+            
+            <div style={{ marginTop: '1.5rem' }}>
+              <h5 style={{ fontWeight: 600, color: '#111827', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.125rem' }}>📈</span>
+                Session Statistics
+              </h5>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '0.5rem', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                    API Calls
+                  </div>
+                  <div style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1e3a8a' }}>
+                    {selectionLogs.length}
+                  </div>
+                </div>
+                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '0.5rem', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                    Success Rate
+                  </div>
+                  <div style={{ fontSize: '1.125rem', fontWeight: 600, color: '#14532d' }}>
+                    {selectionLogs.length > 0 
+                      ? Math.round((selectionLogs.filter(log => !log.error).length / selectionLogs.length) * 100)
+                      : 0}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="api-logs" activeTab={activeTab} className="flex-1 flex flex-col">
+            <div className="api-logs-container-full">
+              <div className="api-logs-header">
+                <h5 className="api-logs-title">
+                  <span className="api-logs-icon">📊</span>
+                  Selection API Activity
+                </h5>
+                <div className="api-logs-stats">
+                  <span className="stat-badge events">
+                    {selectionLogs.length} Events
+                  </span>
+                  <span className="stat-badge success">
+                    {selectionLogs.filter(log => !log.error).length} Success
+                  </span>
+                  {selectionLogs.filter(log => log.error).length > 0 && (
+                    <span className="stat-badge errors">
+                      {selectionLogs.filter(log => log.error).length} Errors
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {selectionLogs.length > 0 ? (
+                <div className="api-logs-content-full">
+                  {selectionLogs.map((log, index) => (
+                    <LogEntry
+                      key={index}
+                      timestamp={log.timestamp}
+                      action={log.action}
+                      offer={log.offer}
+                      request={log.request}
+                      response={log.response}
+                      error={log.error}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="api-logs-empty-full">
+                  <EmptyState
+                    icon="📋"
+                    title="No API Activity"
+                    description="API calls will appear here when you interact with offers"
+                  />
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="session-api" activeTab={activeTab} className="flex-1 flex flex-col">
+            <div className="session-api-container-full">
+              <div className="session-api-header">
+                <h5 className="session-api-title">
+                  <span className="session-api-icon">🔍</span>
+                  Session API Calls
+                </h5>
+                <div className="session-api-stats">
+                  <span className="stat-badge events">
+                    {sessionDetailsLogs.length} Calls
+                  </span>
+                  <span className="stat-badge success">
+                    {sessionDetailsLogs.filter(log => !log.error).length} Success
+                  </span>
+                  {sessionDetailsLogs.filter(log => log.error).length > 0 && (
+                    <span className="stat-badge errors">
+                      {sessionDetailsLogs.filter(log => log.error).length} Errors
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {sessionDetailsLogs.length > 0 ? (
+                <div className="session-api-content-full">
+                  {sessionDetailsLogs.map((log, index) => (
+                    <LogEntry
+                      key={index}
+                      timestamp={log.timestamp}
+                      action="session_details"
+                      request={log.request}
+                      response={log.response}
+                      error={log.error}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="session-api-empty-full">
+                  <EmptyState
+                    icon="🔍"
+                    title="No Session API Calls"
+                    description="Session API calls will appear here when you get session details"
+                  />
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </EmbeddedSidebar>
     </div>
   )
 }
