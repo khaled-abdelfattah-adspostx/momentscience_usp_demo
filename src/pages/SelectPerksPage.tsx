@@ -1456,6 +1456,33 @@ const SelectPerksPage = () => {
                 </div>
               </div>
               
+              {/* Get Session Details Button */}
+              <div className="mb-4">
+                <button
+                  onClick={() => {
+                    getSessionDetails()
+                  }}
+                  disabled={sessionDetailsLoading}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
+                    sessionDetailsLoading 
+                      ? 'bg-gray-400 text-white cursor-not-allowed' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+                  }`}
+                >
+                  {sessionDetailsLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-transparent border-t-white rounded-full animate-spin"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <span>🔍</span>
+                      Get Session Details
+                    </>
+                  )}
+                </button>
+              </div>
+              
               {sessionDetailsLogs.length > 0 ? (
                 <div className="session-api-content-full">
                   {sessionDetailsLogs.map((log, index) => (

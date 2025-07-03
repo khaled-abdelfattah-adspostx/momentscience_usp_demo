@@ -5,10 +5,19 @@ import './LogComponentsFallback.css'
 const formatAsCurl = (request: any) => {
   if (!request) return '';
 
-  let url = request.url || '';
-  const method = request.method || 'GET';
-  const headers = request.headers || {};
+  // Handle different request object structures
+  let url = request.endpoint || request.url || '';
+  const method = request.method || 'POST'; // Default to POST since most USP API calls are POST
+  const headers = request.headers || {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${request.apiKey || '[API_KEY]'}`
+  };
   const body = request.body || null;
+  
+  // If we already have a pre-formatted curl command, use it
+  if (request.curl) {
+    return request.curl;
+  }
   
   // Start building the cURL command
   let curlCommand = `curl -X ${method} "${url}"`;
@@ -175,8 +184,8 @@ export const LogEntry = ({ timestamp, action, offer, request, response, webhook,
         </div>
       )}
 
-      {/* Request and Response Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Request and Response Sections */}
+      <div className="space-y-6">
         {/* Request Section */}
         {request && (
           <div className="space-y-3">
@@ -190,11 +199,11 @@ export const LogEntry = ({ timestamp, action, offer, request, response, webhook,
               </div>
             </div>
             
-            {/* cURL Command */}
-            <details className="group">
-              <summary className="cursor-pointer p-3 bg-slate-800 text-white rounded-t-lg hover:bg-slate-700 transition-colors">
+            {/* Unified Request Details */}
+            <details className="group" open>
+              <summary className="cursor-pointer p-3 bg-blue-600 text-white rounded-t-lg hover:bg-blue-700 transition-colors">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-sm">cURL Command</span>
+                  <span className="font-medium">Request Details</span>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={(e) => {
@@ -202,33 +211,45 @@ export const LogEntry = ({ timestamp, action, offer, request, response, webhook,
                         e.stopPropagation();
                         navigator.clipboard.writeText(formatAsCurl(request));
                       }}
-                      className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded transition-colors"
+                      className="px-2 py-1 text-xs bg-blue-700 hover:bg-blue-800 rounded transition-colors"
+                      title="Copy cURL command"
                     >
-                      📋 Copy
+                      📋 Copy cURL
                     </button>
-                    <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                    <span className="text-blue-200 group-open:rotate-180 transition-transform">▼</span>
                   </div>
                 </div>
               </summary>
-              <div className="bg-slate-900 rounded-b-lg overflow-hidden">
-                <pre className="p-4 text-sm font-mono text-green-400 overflow-x-auto max-h-48">
-                  {formatAsCurl(request)}
-                </pre>
-              </div>
-            </details>
-
-            {/* Raw Request */}
-            <details className="group">
-              <summary className="cursor-pointer p-3 bg-gray-100 rounded-t-lg hover:bg-gray-200 transition-colors">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-700">Raw Request Data</span>
-                  <span className="text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              <div className="border border-blue-200 rounded-b-lg bg-white overflow-hidden">
+                {/* cURL Command Section */}
+                <div className="border-b border-gray-200">
+                  <div className="p-3 bg-gray-50 border-b border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">🔧 cURL Command</span>
+                      <span className="text-xs text-gray-500">(Copy-paste ready)</span>
+                    </div>
+                  </div>
+                  <div className="bg-slate-900">
+                    <pre className="p-4 text-sm font-mono text-green-400 overflow-x-auto max-h-48">
+                      {formatAsCurl(request)}
+                    </pre>
+                  </div>
                 </div>
-              </summary>
-              <div className="bg-white border border-gray-200 rounded-b-lg">
-                <pre className="p-4 text-xs font-mono text-gray-700 overflow-x-auto max-h-40">
-                  {JSON.stringify(request, null, 2)}
-                </pre>
+                
+                {/* Raw Request Data Section */}
+                <div>
+                  <div className="p-3 bg-gray-50 border-b border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">📄 Raw Request Data</span>
+                      <span className="text-xs text-gray-500">(JSON format)</span>
+                    </div>
+                  </div>
+                  <div className="bg-white">
+                    <pre className="p-4 text-xs font-mono text-gray-700 overflow-x-auto max-h-40">
+                      {JSON.stringify(request, null, 2)}
+                    </pre>
+                  </div>
+                </div>
               </div>
             </details>
           </div>
