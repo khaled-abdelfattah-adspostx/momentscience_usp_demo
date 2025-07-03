@@ -158,12 +158,13 @@
 .hero-form .form {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .hero-form .form-group {
   display: flex;
   flex-direction: column;
+  min-height: auto;
 }
 
 .hero-form .label {
@@ -206,10 +207,18 @@
   color: #e53e3e;
   font-size: 0.75rem;
   margin-top: 0.25rem;
+  font-weight: 400;
+  line-height: 1.4;
+  display: block;
+  margin-bottom: 0;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
 }
 
 .hero-form .demo-toggle {
-  margin: 0.5rem 0;
+  margin: 1rem 0;
 }
 
 .hero-form .toggle-container {
@@ -217,23 +226,26 @@
   align-items: center;
   cursor: pointer;
   font-size: 0.875rem;
+  user-select: none;
+  gap: 0.75rem;
 }
 
 .hero-form .toggle-input {
   position: absolute;
   opacity: 0;
-  cursor: pointer;
+  width: 0;
+  height: 0;
 }
 
 .hero-form .toggle-slider {
   position: relative;
   display: inline-block;
-  width: 44px;
-  height: 24px;
-  background-color: #cbd5e0;
-  border-radius: 24px;
-  transition: all 0.3s ease;
-  margin-right: 0.75rem;
+  width: 48px;
+  height: 26px;
+  background-color: #e2e8f0;
+  border-radius: 26px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
 }
 
 .hero-form .toggle-slider::before {
@@ -241,12 +253,13 @@
   position: absolute;
   height: 20px;
   width: 20px;
-  left: 2px;
-  top: 2px;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
   background-color: white;
   border-radius: 50%;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .hero-form .toggle-input:checked + .toggle-slider {
@@ -254,7 +267,16 @@
 }
 
 .hero-form .toggle-input:checked + .toggle-slider::before {
-  transform: translateX(20px);
+  transform: translateX(25px) translateY(-50%);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+}
+
+.hero-form .toggle-slider:hover {
+  background-color: #cbd5e0;
+}
+
+.hero-form .toggle-input:checked + .toggle-slider:hover {
+  background-color: #5a67d8;
 }
 
 .hero-form .toggle-text {
@@ -445,6 +467,7 @@
 .form-group {
   display: flex;
   flex-direction: column;
+  min-height: auto;
 }
 
 .label {
@@ -485,9 +508,16 @@
 
 .error-message {
   color: #e53e3e;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  font-weight: 400;
+  line-height: 1.4;
+  display: block;
+  margin-bottom: 0;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
 }
 
 /* Demo Toggle */

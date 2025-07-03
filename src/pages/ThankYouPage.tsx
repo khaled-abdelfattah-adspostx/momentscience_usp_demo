@@ -316,32 +316,13 @@ const ThankYouPage: React.FC = () => {
             
             <div className="grid lg:grid-cols-2 gap-8">
               
-              {/* Webhook Information */}
-              <div>
-                <h4 className="text-xl font-bold text-gray-900 mb-4">Webhook Payload</h4>
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-medium text-gray-600">JSON Response</span>
-                    <button
-                      onClick={() => copyToClipboard(JSON.stringify(displayWebhookPayload, null, 2))}
-                      className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-lg transition-colors font-medium"
-                    >
-                      Copy JSON
-                    </button>
-                  </div>
-                  <pre className="text-sm text-gray-700 overflow-x-auto max-h-64 bg-white p-4 rounded-lg border">
-                    {JSON.stringify(displayWebhookPayload, null, 2)}
-                  </pre>
-                </div>
-              </div>
-
               {/* API Details */}
               <div>
                 <h4 className="text-xl font-bold text-gray-900 mb-4">API Information</h4>
                 <div className="space-y-4">
                   <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                     <h5 className="font-medium text-gray-900 mb-2">Endpoint</h5>
-                    <code className="text-sm text-gray-700 bg-white p-2 rounded border block">
+                    <code className="text-sm text-gray-700 bg-white p-2 rounded border block break-all overflow-x-auto">
                       {state.wrapSessionRequest?.endpoint || '/api/wrap-session'}
                     </code>
                   </div>
@@ -374,61 +355,86 @@ const ThankYouPage: React.FC = () => {
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* Webhook Field Descriptions */}
-            {state.webhookFieldDescriptions && (
-              <div className="mt-8">
-                <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <svg className="w-6 h-6 mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Webhook Field Descriptions
-                </h4>
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                  <div className="grid gap-4">
-                    {Object.entries(state.webhookFieldDescriptions).map(([field, description]) => (
-                      <div key={field} className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="flex flex-col md:flex-row md:items-start gap-3">
-                          <code className="text-sm font-mono bg-blue-50 text-blue-800 px-3 py-1 rounded border md:min-w-fit">
-                            {field}
-                          </code>
-                          <span className="text-sm text-gray-700 flex-1">
-                            {String(description)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Wrap Session Response */}
-            {state.wrapSessionResponse && (
-              <div className="mt-8">
-                <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <svg className="w-6 h-6 mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Wrap Session API Response
-                </h4>
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+              {/* Webhook Information */}
+              <div className="flex flex-col">
+                <h4 className="text-xl font-bold text-gray-900 mb-4">Webhook Payload</h4>
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 h-[36rem]">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-medium text-gray-600">API Response</span>
+                    <span className="text-sm font-medium text-gray-600">JSON Response</span>
                     <button
-                      onClick={() => copyToClipboard(JSON.stringify(state.wrapSessionResponse, null, 2))}
-                      className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-2 rounded-lg transition-colors font-medium"
+                      onClick={() => copyToClipboard(JSON.stringify(displayWebhookPayload, null, 2))}
+                      className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-lg transition-colors font-medium"
                     >
-                      Copy Response
+                      Copy JSON
                     </button>
                   </div>
-                  <pre className="text-sm text-gray-700 overflow-x-auto max-h-64 bg-white p-4 rounded-lg border">
-                    {JSON.stringify(state.wrapSessionResponse, null, 2)}
+                  <pre className="text-sm text-gray-700 overflow-auto h-[32rem] bg-white p-4 rounded-lg border">
+                    {JSON.stringify(displayWebhookPayload, null, 2)}
                   </pre>
                 </div>
               </div>
-            )}
+            </div>
+          </div>
+        )}
+
+        {/* API Response and Webhook Field Descriptions Row */}
+        {showTechnicalDetails && (state.wrapSessionResponse || state.webhookFieldDescriptions) && (
+          <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 mb-8">
+            <div className="grid lg:grid-cols-2 gap-8">
+              
+              {/* Wrap Session API Response - 50% width */}
+              {state.wrapSessionResponse && (
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <svg className="w-6 h-6 mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Wrap Session API Response
+                  </h4>
+                  <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 h-96">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm font-medium text-gray-600">API Response</span>
+                      <button
+                        onClick={() => copyToClipboard(JSON.stringify(state.wrapSessionResponse, null, 2))}
+                        className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-2 rounded-lg transition-colors font-medium"
+                      >
+                        Copy Response
+                      </button>
+                    </div>
+                    <pre className="text-sm text-gray-700 overflow-auto h-80 bg-white p-4 rounded-lg border">
+                      {JSON.stringify(state.wrapSessionResponse, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Webhook Field Descriptions - 50% width */}
+              {state.webhookFieldDescriptions && (
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <svg className="w-6 h-6 mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Webhook Field Description
+                  </h4>
+                  <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 h-96">
+                    <div className="space-y-3 overflow-auto h-80">
+                      {Object.entries(state.webhookFieldDescriptions).map(([field, description]) => (
+                        <div key={field} className="bg-white p-3 rounded-lg border border-gray-200">
+                          <code className="text-xs font-mono bg-blue-50 text-blue-800 px-2 py-1 rounded border block mb-2">
+                            {field}
+                          </code>
+                          <span className="text-xs text-gray-700">
+                            {String(description)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
